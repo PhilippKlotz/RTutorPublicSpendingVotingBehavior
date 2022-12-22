@@ -1,0 +1,855 @@
+
+```{r 'check_ps', include=FALSE}
+
+user.name = 'ENTER A USER NAME HERE'
+```
+
+
+## Exercise Overview
+
+### Public Spending and Voting Behavior - An Interactive Analysis with R
+
+**Welcome!** You are about to begin this problem set which is part of my bachelor thesis at the University of Ulm. In this problem set, we discuss the effects of public good spending on voting behavior in the USA. There is a corresponding empirical analysis in the article <a href="https://www.aeaweb.org/articles?id=10.1257/pol.20170151" target="_blank">Stimulating the Vote: ARRA Road Spending and Vote Share</a>, written by Emiliano Huet-Vaughn (2019) to which we refer during this problem set. The article is limited to New Jersey. You can find the complete data <a href="https://www.openicpsr.org/openicpsr/project/114715/version/V1/view" target="_blank">here</a>. We will follow the procedure of the underlying paper during this problem set.
+
+During this problem set, we will use the quasi-experimental design of the American Recovery and Reinvestment Act (ARRA). This law was implemented in 2009 during Obama's term as a project of the Democrats. The act aimed to provide much-needed stimulus funds during the Great Recession, primarily through monies for highway and bridge projects. The total value designated for infrastructure investments was about $108 billion. The act was mainly associated with the Democratic Party. A key feature of the ARRA program was the fact that all construction projects were labeled with a <a href="https://www.codot.gov/assets/images/news/new-release-images/constructionsignARRA.jpg/image_view_fullscreen" target="_blank">sign</a>, indicating the origin of the funds and the party associated with them.  
+On this basis, we now ask ourselves whether voters (in our case from New Jersey) who directly took benefit from one of these public good spending projects also reconsidered their voting behavior. In our analyses, we only focus on the effect on the Democratic Presidential vote share. Accordingly, when we talk about vote share, we will refer to the Presidential vote share.
+
+Existing works mainly focus on the effect of cash transfer programs on voting behavior, rather than on public good spending like the ARRA program. As these cash transfers differ from public goods, we can assume that their effect on voting behavior will also vary. The main difference to cash transfers is that these appear directly in a voters' wallets whereas public goods only show up in their consumption bundles. Because of this fact it is much more difficult to target a dollar spent for public goods to a voters’ preferences. It is therefore conceivable that the effect of public good spending on voting behavior could be significantly smaller or, under certain circumstances, not even exist.
+
+```{r eval=FALSE}
+# Run for additional info in the Viewer pane
+info("Public goods")
+```
+
+The problem set is structured as follows:  
+
+  1. Overview of the date set and the variables  
+  2. Descriptive analyses  
+  3. Motivating the difference in difference approach
+  4. Estimating the treatment effect using linear regressions
+  5. The Background - Where are all the votes coming from?
+  6. Mechanisms behind the effect
+  7. Conclusion  
+  8. Appendix
+  9. References
+
+This problem set consists of theoretical principles, code chunks, info boxes, and quizzes. To solve a task, you will enter some R code into the chunks. After editing the chunk, you have to press `check` in order to get feedback on whether your solution is correct. Every time you start a new exercise you have to press `edit` first. If you need further advice, press the `hint` button for more detailed information or some hints. In case this does not help you, you can always try to find the solution via Google or just access the solution with the `solution` button. The info boxes provide you with background information and additional comments. Quizzes are included to test your newly acquired knowledge. For a choice of code chunks and quizzes that you solved successfully, you will get awards. You don't have to work through the chapters in the prescribed order but it helps since they build on each other.
+
+Have fun solving the tasks and collecting awards! 
+
+## Exercise 1 -- Overview of the date set and the variables
+
+In the first chapter, we try to get an overview of the most important variables and learn a few basic R commands. To work with a data set we first have to load it into our environment.  
+
+<b style="color:blue">Task:</b> Use the command `readRDS()` to load the downloaded file `ARRA.RDS` and assign it to the variable `ARRA`. Also, take a look at the first few rows with the standard command `head()`.
+
+```{r "2_1"}
+# Enter your code here.
+```
+
+As you see, the data frame contains quite a few variables and that's not even all of them. The original data set contained 68 columns. I selected the variables relevant to our purposes and dropped the rest to make our analyses a bit easier and clearer. Nevertheless, I want you to choose some central variables in the next step to get a better overview. The package `dplyr` contains some commands which greatly simplify our work with data frames.
+
+
+Quiz: What do you think, which command suits best to choose only certain variables?
+
+[1]: select()
+[2]: summarize()
+[3]: group_by()
+[4]: filter()
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("dplyr")
+```
+
+Good job. We use the command `select()` to select columns of a data set, whereas `filter()` can be used to choose rows based on certain values. The `group_by()` and `summarize()` commands are often used in combination to group for a certain variable, for example, the years in which an observation was made, and then compress the data frame to only show the particular year and the mean of another variable. In addition, the `dplyr` package offers the possibility to chain several commands together in a meaningful order. So it is not necessary to re-target data sets for each step of data processing or to write a new command from scratch. This chain is called **pipe** and is represented by the characters **%>%** in R. If you are interested in more detail regarding this package you can look it up <a href="https://cran.r-project.org/web/packages/dplyr/vignettes/dplyr.html" target="_blank">here</a>.
+
+Let's try to use this function.
+
+<b style="color:blue">Task:</b> First you have to load the `dplyr` package. Use the right command to only keep the following variables from the ARRA data: `Municipality`, `InputID`, `year`, `Distance`, `treated`, and `demo_share`. Store the new data frame in `ARRA_central` and show its head.
+```{r "2_2"}
+library(___)
+ARRA_central = ARRA %>%
+  ____(c(___, ___, ___, ___, ___, ___))
+head(___)
+
+```
+
+<b style="color:blue">Task:</b> Since our new data set is much more clearly arranged, we can run `summary()` on it. This command can be used to create quick summary statistics of a data set such as the mean, the median, and more.
+```{r "2_3"}
+# Enter your code here.
+```
+
+Well done. As you can see, our data set contains the variable `Municipality`. A municipality is a district in the US, whereas many municipalities build a county, and many counties build a state. We can compare these municipalities with 'Gemeinden' in Germany. Generally speaking, a municipality can be designed as a city, borough, village, or town. Of course, there are other important variables in our data set. The `InputID` is a kind of code for the unique identification of each municipality and the `year` shows in which year the respective observation was made. For each municipality, there are four observations (rows), namely in the years 2000, 2004, 2008, and 2012, because only in these years elections took place, and thus the Democratic vote share (`demo_share`) could be determined. `Distance` indicates the distance of the municipality to the nearest ARRA construction project. Furthermore, we find the very important variable `treated` in our data set, which is rather 0 or 1 and therefore called a **dummy variable**. If you think of our experiment and take a look into the data set, which fact do you think `treated` is based on?
+Remember: We want to estimate the effect of proximity to an ARRA construction project on future voting behavior.
+
+
+Quiz: What do you think the variable treatment tells us?
+
+[1]: Whether a municipality is a township.
+[2]: Whether a municipality has more the 5000 residents.
+[3]: Whether the distance to an ARRA project is relatively low.
+[4]: Whether there was an election.
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("To be treated or not to be.")
+```
+
+Indeed the variable `treated` is equal to 1 if an ARRA project is within a distance of 0.05 decimal degrees, which is about 5 km from the center of the municipality. In fact, it's exactly 5.55 km, but in this problem set, we will consider a distance of about 5 km for the sake of simplicity. Note that this fact does not influence any of our results. Based on this, our treatment group contains all the municipalities that are located near an ARRA public good project and the control group contains all the other ones. This fact allows us to compare the election results of both groups and hence estimate the effect of the public goods spending on election results. Before we head on to exercise 2, I want you to answer another question.
+
+
+Quiz: Take a look at the summary of the column `treated` that we have created above. Which group do you think contains more observations, the treatment or the control group?
+
+[1]: The treatment group is larger
+[2]: The control group is larger
+[3]: We can't answer the question based on our data.
+[4]: They are the same size.
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("Comparison of sizes")
+```
+
+You are right! As the mean of `treated` is about 0.29 what means that there are significantly more municipalities that are classified as control (treated = 0) than treatment (treated = 1). If all observations would be classified as treated (control) the mean of the variable `treated` would be 1 (0). In case the mean would be equal to 0.5, both groups would contain the same number of observations.
+
+As you head on to exercise 2 we will dive deeper into descriptive analyses and perform some nice plots that give you a better feeling of which municipalities were treated or not. From here on, we will again work with the larger `ARRA` data set. `ARRA_central` has only served to introduce you to the most important variables and to apply some basic commands to it.
+
+
+## Exercise 2 -- Descriptive analyses
+
+We have to load the data set `ARRA` at the beginning of every exercise. Simply press the check button.
+```{r "3_1"}
+ARRA = readRDS("ARRA.RDS")
+```
+
+In the last exercise, we discussed the classification of the treatment and control group but we still don't know how this looks geographically. To this end, we try to plot a map of New Jersey, divided by municipalities, showing for each one whether it was treated or not. To do so we need the geographical mapping data for the state of New Jersey. Since it was not available in the original data of `ARRA` we have to search for it on the internet. I have already provided it to you as `map.RDS` but if you are interested in details you can look it up <a href="https://njogis-newjersey.opendata.arcgis.com/maps/municipal-boundaries-of-nj" target="_blank">here</a>. 
+
+<b style="color:blue">Task:</b> Load the `map.RDS` file in your environment, assign it to the variable `map` and show the head of it.
+```{r "3_2"}
+# Enter your code here.
+```
+
+As you can see, the data set has only two columns `CENSUS2010` and `geometry`, where the last one looks quite complex. Based on this single column we are already able to plot the map of New Jersey divided by its municipalities using `ggplot()` from the package `ggplot2`. It may take a few seconds until a result appears. Please take your time.
+
+<b style="color:blue">Task:</b> Simply press the check button.
+```{r "3_3",out.width='75%'}
+library(ggplot2)
+ggplot(data=map) + 
+  geom_sf(mapping = aes(geometry = geometry)) +
+  ggtitle("Figure 1: New Jersey divided by municipalities") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+As you see, it is possible to create plots that seem to be relatively complex with such a simple command. So far we got a plot that shows us the municipalities in New Jersey. However, Figure 1 does not yet contain any further information relevant to us. Our next goal is to add some colors, that tell us whether a single municipality was treated, which means whether or not the distance to the nearest ARRA project is less than 5 km. To do so, we have to combine some information. At this point, `geometry` and `treated` are in two different data sets. To generate the plot we have in mind, we need to link these two pieces of information together, so that R knows which municipality (`geometry`) has been treated. For this purpose, it helps that the variable `CENSUS2010` from the data set `map` contains values corresponding to the `InputID` from `ARRA`.
+
+Before we join the data sets, let's take a quick look at the data types of the two variables that are relevant to us. The `class()` function allows us to do this straightforwardly.
+
+<b style="color:blue">Task:</b> Use the mentioned command to access the data type of `InputID` and `CENSUS2010`. Note that the two variables come from two different data sets.
+
+```{r "3_4"}
+# Enter your code here.
+```
+
+Good job! As you can see, the two variables have different data types. `InputID` is defined as numeric, while `CENSUS2010` is a character. Since this would lead to problems when joining, we first have to make sure that both have the same data type.
+
+```{r eval=FALSE}
+# Run for additional info in the Viewer pane
+info("Basic data types in R")
+```
+
+<b style="color:blue">Task:</b> Complete the code below to change the data type of `CENSUS2010` from character to numeric.
+```{r "3_5"}
+map$___ = as.numeric(___$CENSUS2010)
+
+```
+
+Let's check whether the transformation worked.
+
+<b style="color:blue">Task:</b> Press check to verify the variables have the same data type.
+
+```{r "3_6"}
+class(ARRA$InputID)
+class(map$CENSUS2010)
+```
+
+Perfect. As you see, both variables are now declared as numeric and we will not get an error when joining both data sets in one of the next tasks. 
+
+As you may recall, for each municipality in our data set there are four observations for the years 2000, 2004, 2008, and 2012 (the years in which elections took place). To generate the plot we want, this circumstance is rather obstructive since the `treated` variable, which is relevant for assigning the colors, does not change in the different years. R would therefore plot each municipality four times in the same color and thus probably take longer. That's why it can be helpful to eliminate these multiple values for our plot.
+
+<b style="color:blue">Task:</b> The following chunk uses the `duplicated()` function to eliminate observations whose `InputID` occurs more than once. Furthermore, for the next tasks, we only keep the columns `InputID`, `Municipality` and `treated` from `ARRA.` Press the check button.
+```{r "3_7"}
+ARRA_single = ARRA[!duplicated(ARRA$InputID), c("InputID", "Municipality", "treated")]
+```
+
+Now we can finally join the new data set `map` with `ARRA_single` to combine the information we need for the plot.
+
+<b style="color:blue">Task:</b> Complete the code below to join the two data sets `map` and `ARRA_single` based on the variables `CENSUS2010` and `InputID`. Assign it to `mapping_data` and show its head. 
+```{r "3_8"}
+___ = left_join(___, ARRA_single, by=c("CENSUS2010"="___"))
+head(___)
+
+```
+
+Great! Besides the `left_join()` we used in the previous chunk, there are many more join functions that can be used to connect data sets in a meaningful way.
+
+```{r eval=FALSE}
+# Run for additional info in the Viewer pane
+info("The join family")
+```
+
+With this new data set, we can now plot our real map, differentiated by the fact of whether a municipality was treated or not. Also with this task, it may take a few seconds until a result appears.
+
+<b style="color:blue">Task:</b> Fill in the blanks below to create the plot. You can refer to the code for generating the plot above.
+```{r "3_9",out.width='75%'}
+ggplot(data=___) +
+  geom_sf(mapping = aes(fill =  factor(___), geometry = ___)) +
+  ggtitle("Figure 2: Raw map of New Jersey differentiated by treatment") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+Well, Figure 2 looks much more appealing and informative but we are not yet done. As you may notice there are some grey areas in the plot which are neither classified as treated nor as control. The problem here is, that R wasn't able to join some of the data in `geometry` with the `treated` variable from `ARRA`. After some research, I concluded, that there are some mistakes in the column `InputID` from `ARRA`. In particular, I found several InputIDs that do not exist in reality, resulting in the fact that there is no match between these incorrect values in `InputID` and the correct ones in `CENSUS2010`. Because of this reason, the treatment status cannot be assigned to `mapping_data`, R creates NAs, and the corresponding areas are colored grey.
+
+To correct these mistakes I used a website that provides basic information about municipalities in New Jersey and allows us to work interactively with a map of it. If you are interested in more information, you can find the website <a href="https://njogis-newjersey.opendata.arcgis.com/maps/municipal-boundaries-of-nj" target="_blank">here</a>. Looking at our incomplete plot above, we know the rough location of the municipalities with the wrong values. With this information, we can go to the map on the website and try to find each of the municipalities. As we have information like the size or the population density in the `ARRA` data set, we can compare it with the online data to ensure we got the right municipalities. After some work, we can find the right identification code for all of the affected municipalities and correct them.  
+In the code below I replaced the wrong values of `InputID` in `ARRA` and created a more appealing plot using commands for selecting a theme, adjusting the legend, and adding a title.
+
+<b style="color:blue">Task:</b> Just press check and wait a few seconds.
+```{r "3_10",out.width='75%'}
+ARRA = ARRA %>%
+     mutate(InputID=replace(InputID, InputID == 3402918130, 3402973125)) %>%
+     mutate(InputID=replace(InputID, InputID== 3402177210, 3402163850)) %>%
+     mutate(InputID=replace(InputID, InputID== 3401309220, 3401309250)) %>%
+     mutate(InputID=replace(InputID, InputID== 3403179820, 3403182423)) %>%
+     mutate(InputID=replace(InputID, InputID== 3402568670, 3402537560)) %>%
+     as.data.frame()
+
+ARRA_single = ARRA[!duplicated(ARRA$InputID), c("InputID", "Municipality", "treated")]
+mapping_data = left_join(map[, c("CENSUS2010", "geometry")], ARRA_single, by=c("CENSUS2010"="InputID"))
+
+ggplot(data=mapping_data) +
+  geom_sf(mapping = aes(fill =  factor(treated), geometry = geometry)) +
+  scale_fill_viridis_d(labels=c('control group', 'treatment group'), option = "inferno", name = "Assignment", alpha = 0.8, begin = 0.1, end = 0.9, direction = -1) +
+  labs(x = NULL, y = NULL, title = "Municipalities in New Jersey") +
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Figure 3: Final map of New Jersey differentiated by treatment") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+Well, in this complete plot, we can see for each municipality in New Jersey whether or not it was part of the treatment group. The municipalities in the control group are colored yellow and those in the treatment group are purple. As we were able to determine in one of the previous tasks, there are significantly more municipalities in the control group than in the treatment group. This means that there are more observations whose distance to the nearest ARRA project is larger than 5 km. Since the two groups differ in the fact whether they benefit from an ARRA project in their area or not, we can compare them to estimate how the public spending program affects election outcomes.  
+So much for our work with the maps. In the next section, we will try to estimate the causal treatment effect by hand and consider the basic idea of the difference in difference estimator.
+
+
+## Exercise 3 -- Motivating the difference in difference approach
+
+We have to load the data set `ARRA` at the beginning of every exercise. Simply press the check button.
+
+```{r "4_1"}
+ARRA = readRDS("ARRA.RDS")
+```
+
+Before we start the inductive analyses and with it the main chapter of the problem set we try to estimate the treatment effect by hand. The gold standard to estimate a causal effect is a **randomized experiment**.  
+Randomization in this context means that relevant environmental conditions should be the same in the treatment and in the control group. The assignment to these groups should therefore not depend on any other variable. In the case of the ARRA project, we especially want the Democratic vote share to be independent of the treatment. This means that the dependent variable (`demo_share`) should be similar in municipalities that are located within a distance of about 5 km of an ARRA project (treatment group) and the other ones (control group). Of course, this only holds in the pre-experimental period, before the last projects took bids in 2010. Since we want to estimate the effect of this public good spending we don't expect the Democratic vote share to be the same in the experimental period after 2010. If this was the case, it would indicate that the effect on the Democratic vote share would be equal to 0.  
+If these conditions for randomization were fulfilled, we could calculate the treatment effect by simply looking at the experimental period i.e. the year 2012, and subtract the average outcome (`demo_share`) of the control group from the one of the treatment group:  
+
+\[\overline{y}_{exp,tr} − \overline{y}_{exp,co}\]
+
+In order to use this formula, we have to do some preperational work.
+
+<b style="color:blue">Task:</b> Fill in the blanks to create a new data set `exp` that only contains observations in the experimental period. To this end, you can look at `year2012e` which is a dummy variable, indicating whether the observation was made in 2012 (experimental period) or before 2012 (pre-experimental period). The data set `exp` should only contain two observations of the two variables `treated` and `y_exp`, with `y_exp` being the mean of `demo_share` for each the treatment and the control group.
+```{r "4_2"}
+exp = ARRA %>%
+  filter(___ == 1) %>%
+  group_by(___) %>%
+  ___(y_exp = mean(___))
+head(___)
+
+```
+
+With this new data set, we can already apply the above formula. For this purpose, we want to assign the two values in `exp` to new variables to make the calculation a bit easier. We can access a single value in a data frame with the following structure: *dataset*$*columnname*[*number of row*]  
+**Note:** In R the first column has the index 1.
+
+<b style="color:blue">Task:</b> Try to use this structure to assign the correct values to `y_exp_tr` and `y_exp_co`.
+```{r "4_3"}
+# Enter your code here.
+```
+
+Well done. In the next step, we can calculate the potential effect based on the above formula.
+
+<b style="color:blue">Task:</b> Use the formula to calculate the effect. Round it by two digits, assign the result to `simple_diff`, and show it.
+
+```{r "4_4"}
+# Enter your code here.
+```
+
+Based on this result we would predict a rise of the Democratic vote share of about 7.32 percentage points in treated municipalities. In a perfectly randomized experiment, the treatment effect would indeed be so easy to calculate. In our case, however, the results are misleading. On closer inspection, we can see that unfortunately there is no perfect randomization for the ARRA experiment. We can check this by looking at the Democratic vote share of the two groups in the years before 2012.
+
+<b style="color:blue">Task:</b> First I want you to complete the code to add the new variable `group` to our data set `ARRA`. It should be either "treated" or "control", depending on which group the observation is in.
+
+```{r "4_5"}
+ARRA = ARRA %>%
+  mutate(___ = ifelse(treated == 1, "___", "control"))
+```
+
+In the next step, we create a new data set from which we can obtain the mean Democratic vote share for each value of year and group.
+
+<b style="color:blue">Task:</b> Complete the code below. The variable `mean_demo_share` should contain the mean Democratic vote share for every combination of `year` and `group.` Assign the new data set to the variable `ARRA_summary` and show it.
+```{r "4_6"}
+___ = ARRA %>%
+  group_by(year, ___) %>%
+  summarize(mean_demo_share = mean(___))
+ARRA_summary
+
+```
+
+Great. As you take a look at the data, you will notice that there are recognizable differences between the average vote shares in the treatment and control group between the years 2000 and 2008. In 2000, for example, the Democratic Party achieved an average vote share of 54.81% in the treatment group, compared to only 49.31% in the control group. This corresponds to a difference of about 5.5 percentage points. For the years 2004 and 2008, we find differences of the same order of magnitude. This difference becomes even clearer if, instead of the table, we look at a graph showing the Democratic vote share for the treatment and control group separately, over the years. For this, we can use the data set that we have just generated. The two lines should be plotted in different colors.
+
+<b style="color:blue">Task:</b> Fill in the blanks to create the required plot. Name the axes “Democratic vote share” and “Years”.
+```{r "4_7"}
+ggplot(data = ___, aes(y=___, x=___, color = group)) +
+  geom_line(size = 1) +
+  ylim(45, 60) +
+  scale_x_continuous(breaks = seq(2000, 2012, by = 4)) +
+  ylab("___") +
+  ___("Years") +
+  ggtitle("Figure 4: Democratic vote shares of treatment and control group") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r eval=FALSE}
+# Run for additional info in the Viewer pane
+info("ggplot()")
+```
+
+As you can see from Figure 4, there is already quite a big difference between the treatment and control group in the pre-experimental period (before 2010). The randomization is therefore insufficient and we cannot use this simple equation. If we did anyway we would ignore the historic difference between the groups and overestimate the true effect.  
+Luckily, there is another econometric method that can handle imperfect randomization relatively well in certain cases. The **difference in difference** approach. The difference in difference (diff in diff or DiD) method considers the outcome of the two groups not only after the treatment but also before that in the pre-experimental period. There are two differences which we subtract from each other: Firstly, the difference between the treatment and control group after the treatment, which corresponds to the simple formula that we have used so far. The second one considers the difference before the treatment.  
+The DiD approach, therefore, estimates the effect of the treatment as how the difference between the treatment and control group has changed in the experimental period compared to the pre-experimental period. This means that we can extend the simple formula we have already used by another term to estimate the causal unbiased treatment effect:
+
+\[DiD = (\overline{y}_{exp, tr} − \overline{y}_{exp, co}) − (\overline{y}_{pre, tr} − \overline{y}_{pre, co})\]
+
+The first term here is equivalent to the formula we have used so far. From this, we subtract the difference in the share of Democratic votes that historically existed between the treatment and control group. If you are interested in more information see Cameron & Trivedi (2005).
+
+Let's now try to calculate the treatment effect by hand using the extended formula.
+
+<b style="color:blue">Task:</b> In the first step, create a new data set `pre`, which, analogous to `exp`, includes the observations before 2012 and contains the mean Democratic vote share `y_pre` for the treatment and control group. You can follow the code for creating `exp` to proceed and adapt it accordingly. Also, show the head of the new data set.
+
+```{r "4_8"}
+# Enter your code here.
+```
+
+
+Good job! Now we can assign these values to two new variables and calculate the DiD estimator quite easily.
+
+<b style="color:blue">Task:</b> Assign the correct values to `y_pre_tr` and `y_pre_co`. As a reminder, here is the structure for it again: *dataset*$*columnname*[*number of row*]
+```{r "4_9"}
+# Enter your code here.
+```
+
+After some preparation work, we can now finally compute the unbiased treatment effect relatively easily. 
+
+<b style="color:blue">Task:</b> Use the extended formula to estimate the causal effect of our treatment. Round it by two digits, assign the result to `DiD`, and show it together with `simple_diff`.
+```{r "4_10"}
+# Enter your code here.
+```
+
+As you see the result of `simple_diff` (7.32) is more than four times larger than the true causal effect `DiD` (1.65). The reason for this difference is that the simple formula does not take into account that there already is a large difference between the treatment and control group before the treatment. The simple formula, therefore, overestimates the true causal effect. So, by extending a very simple formula a bit, we find the unbiased effect of the treatment to be about 1.65 percentage points. This means that being relatively close to an ARRA project increases the share of Democratic votes in that municipality by about 1.65 percentage points. Later we will show that we find the same effect by using regression models.  
+Talking about the effect, it is important to speak of percentage points and not percentages. A short example: Assume that the Democratic share of the vote was 50% before the experiment and we find (for the sake of simplicity) a causal treatment effect of 10 percentage points. The new share of votes after the treatment would be 60%. If instead we were talking about an effect of 10%, the new share would be 50% + (50% * 0.1) = 55%. Note, therefore, that when we are talking about the difference between two percentage values, we usually talk about percentage points.
+
+So far we have assumed that we can easily use the difference in difference estimator without meeting any requirements. However, there is a crucial assumption that must be fulfilled in order to use the DiD, the so-called **parallel trend assumption**. This means that in case no experiment took place, the difference between the average output (the mean Democratic vote share) of the treatment and control group should be constant. A good way to check whether this requirement is met is to look at a graph that shows the historical course of `demo_share` for the treatment and control group. Luckily, we have already generated the necessary data when checking for the randomization into treatment and control group.
+
+<b style="color:blue">Task:</b> Press check to plot the same graph as above. In addition, we add a vertical line in 2010, which marks the beginning of the experimental period.
+```{r "4_11",out.width='75%'}
+ggplot(data = ARRA_summary, aes(y=mean_demo_share, x=year, color = group)) +
+  geom_line(size = 1) +
+  geom_vline(aes(xintercept=2010)) +
+  ylim(45, 60) +
+  scale_x_continuous(breaks = seq(2000, 2012, by = 4)) +
+  ylab("Democratic vote share") + 
+  xlab("Years") +
+  ggtitle("Figure 5: The Parallel Trend Assumption") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+
+Quiz: Is the parallel trend assumption fulfilled for our ARRA project?
+
+[1]: Yes it is. The lines run parallel until the experimental period begins.
+[2]: No, because after the year 2010 the trends do not run parallel anymore.
+[3]: We can't check this assumption based on this plot.
+[4]: No, because the difference between both lines is too small.
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("Parallel trends")
+```
+
+To satisfy the parallel trend assumption we only need the difference between the treatment and control group to be constant before the treatment. Based on Figure 5, this means that the two lines should run parallel before the year 2010. Let's check that out.  
+I think we can agree on the fact that the lines run parallel until 2008 and begin to vary according to their slope after 2008. The question is now if the parallel trend assumption is violated because of the trend between 2008 and 2010. As we take a quick look into the data (`ARRA_summary`) we notice that we only find data for 2000, 2004, 2008, and 2012 because the election only takes place every four years. That means that the slope between the years 2008 and 2010 for the treatment and control group is indicated by the Democratic vote share in 2012. Of course, since there was no election in 2010 and we, therefore, don't have any data, we can't tell for sure whether the parallel trend assumption is satisfied. However, we will assume in the following that this holds. Since the lines run parallel from 2000 to 2008 we assume that this is also the case for the next two years. The parallel trend assumption is therefore fulfilled and we can use the difference in difference estimator.
+
+Calculating the difference in difference estimator with the formula we used in this chapter is a relatively easy and intuitive method. In addition to this, it is possible to estimate the effect using linear regressions. We will focus on this approach in the following chapter.
+
+## Exercise 4 -- Estimating the treatment effect using linear regressions
+
+We have to load the data set `ARRA` at the beginning of every exercise. Simply press the check button.
+
+```{r "5_1"}
+ARRA = readRDS("ARRA.RDS")
+```
+
+We're finally about to begin our work with some real regressions regarding the ARRA project. You may be wondering why we should still estimate the causal treatment effect via regression models when there is the possibility of calculating it quite easily with a formula. One of the main reasons is, that we did not obtain any standard errors for our estimator in the last chapter and therefore weren't able to make any statements about significance. Another reason is that we are much more flexible in regressions to, for example, control for certain influences, but more on that later. In the following tasks, we will first consider the basic regression equation to estimate the treatment effect:
+
+\[DemVoteShare_{it} = \beta_{1}(Treated_{i}*Post_{t})+\beta_{2}Treated_{i}+\beta_{3}Post_{t}+\beta_{4}X_{i}+ u_{i,t}\]
+
+Let's briefly look at the components of this equation. `demo_share` as our dependent variable represents the Democratic vote share. We aim to estimate the causal unbiased treatment effect on it. Furthermore, there is the variable **Treated**, whose meaning should be clear, **Post**, which is an indicator for the year being 2012, as well as the interaction term **Treated*Post**. This term is a product of two dummy variables and therefore only equal to 1 if both **Treated** and **Post** are equal to 1. In all other cases, it is equal to 0. The estimated coefficient for this term represents the treatment effect we are looking for. With **X** we find a variable that stands for possible further impacts which we will control for later. The last term **u** is called error term and contains the impact of factors that influence our dependent variable `demo_share`, for which we do not control for in our regression.
+
+Before we start estimating the treatment effect. Let's create a variable for the interaction term Treated*Post. This will make our work easier later on.
+
+<b style="color:blue">Task:</b> Create a new variable `treated_year2012e` in `ARRA` as an interaction of the two dummies `treated` and `year2012e`.
+
+```{r "5_2"}
+# Enter your code here.
+```
+
+Here we are. In the next tasks, we will use the `felm()` function from the `lfe` package. It's a popular function to fit a linear model with multiple fixed effects. It also allows us to add, for instance, cluster robust standard errors and fixed effects but more on that later. If you are interested in more details, click <a href="https://www.rdocumentation.org/packages/lfe/versions/2.8-8/topics/felm" target="_blank">here</a>.
+
+The basic structure of the `felm()` function for our purposes is as follows:  
+**felm(y ~ control variables | fixed effects | 0 | cluster robust standard error, data = dataset)**  
+
+First, we consider a simple regression without fixed effects and cluster robust standard errors. We will come to these extensions later and ignore them for now.
+
+<b style="color:blue">Task:</b> As a first step we load the `lfe` package. We also estimate a regression with the three descriptive variables `treated_year2012e`, `treated`, and `year2012e` and the Democratic vote share as the dependent variable. The result is assigned to `reg1` and shown with the `summary()` command. Press the check button.
+
+```{r "5_3"}
+library(lfe)
+reg1 = felm(demo_share ~ treated_year2012e + treated + year2012e, data = ARRA)
+summary(reg1)
+```
+
+If you don't have any experience yet how to read the regression output of the `summary()` function, you can have a look <a href="https://towardsdatascience.com/understanding-linear-regression-output-in-r-7a9cbda948b3" target="_blank">here</a>. This is also helpful for later tasks, since the stargazer output can be interpreted relatively similar.
+
+As you see, our relevant estimator (`treated_year2012`) is the same as in the last chapter, where we calculated the causal effect of the treatment by hand. In both cases, we estimated a ~1.65 percentage point increase in the presidential vote share for the Democratic Party in municipalities that are close to an ARRA construction project. In addition, we see the relevant standard error in our regression and thus have the opportunity to make statements about the significance of our DiD estimator. With a standard error of 1.430 for `treated_year2012e`, our estimator is not significant. Let's see if this changes as we head on to our next model.
+
+The formula R is using by default to compute the standard errors is only correct for the case if the error term u is identically and independently distributed (**iid**). This means that all error terms should have the same probability distribution and be independent of each other. As a reminder, the error term u contains all those influences for which we do not control for in our regression.  
+Now, it is quite conceivable that this iid condition is not met, but that there are subsamples in the data for which the error terms are correlated. This correlation occurs primarily when characteristics (demographic, social, etc.) within clusters are the same or even similar. This would be quite conceivable in our case since we are dealing with individual municipalities and such similarities between neighboring municipalities are quite likely. For this type of data, which is clustered, we use **cluster robust standard errors**, since the conventional standard errors wouldn't be correct. In particular, it is quite common that the regular standard errors (which ignore the correlation of the error terms) are significantly smaller than the clustered standard errors. This would cause misleading results in terms of significance. See Cameron & Miller (2015) if you are interested in a deeper insight into the topic.  
+Because of this reason we decide to include cluster robust standard errors for the municipalities, using the variable `InputID`, which is a specific identification code for each municipality. To include cluster robust standard errors in the `felm()` command, we need two placeholders (0), each separated by a vertical line, and after the last line the variable for which we want to add clustered errors. You can also look at the structure of the `felm()` command mentioned above.
+
+<b style="color:blue">Task:</b> Complete the code below to estimate the model with cluster robust standard errors and assign it to `reg2`. Load the `stargazer` package and use the `stargazer()` command from it. Use this function to show both results (`reg1` and `reg2`) side by side.
+```{r "5_4",results='asis'}
+library(___)
+___ = felm(___ ~ treated_year2012e + treated + year2012e |0|0| ___, data = ___)
+stargazer(___,___, type = "html", title = "Table 1: Estimating the treatment effect via basic regressions", add.lines=list(c('Cluster robust standard errors', 'x','✓')))
+
+```
+
+**Note:** From now on, instead of `summary()`, we will use the `stargazer()` command to display the results of our regressions. This allows us to easily create appealing tables that provide an overview of the most important results of a regression and display multiple regressions side by side. Click <a href="https://www.rdocumentation.org/packages/stargazer/versions/5.2.3/topics/stargazer" target="_blank">here</a> for more information regarding the `stargazer()` function.
+
+```{r eval=FALSE}
+# Run for additional info in the Viewer pane
+info("Interpreting the stargazer output")
+```
+
+
+Quiz: Compare both columns. What do you notice?
+
+[1]: The standard errors for all coefficients decrease.
+[2]: The standard error for treated_year2012e decreases sharply.
+[3]: The significance of the relevant coefficient remains the same.
+[4]: We estimate slightly different effects.
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("Different standard errors")
+```
+
+You're right. As soon as we add cluster robust standard errors for the `InputID`, the standard error for our relevant estimator becomes significantly smaller and drops to 0.365. This fact conflicts with the experiences we just mentioned, namely that clustered standard errors are usually significantly larger than regular ones. However, this fact is rather in our favor, since we take the correlation of the error terms into account and additionally obtain significantly lower standard errors for the relevant estimator. Of course the change in the standard errors also affects the significance. Our new estimator for `treated_year2012e` is significant even at the 1% level. The magnitude of all estimated coefficients remains the same. The standard errors of the other two coefficients change too, with the one of `treated` increasing and the one of `year2012e` decreasing. In the further course of our problem set, we will include the cluster robust standard errors in each regression model.
+
+Another extension to our simple standard regression model is to include **fixed effects**. But what exactly are fixed effects? Imagine you want to estimate how a continuing education program affects the likelihood of finding a job. If you think about this problem, you will relatively quickly conclude that participation in the training measure depends, among other things, on personal skills and motivation which differ for individuals and for which we cannot observe. We call this **heterogeneity.** This usually leads to **omitted variables bias**. Let's take a closer look at this term. An omitted variable, as the name suggests, is a variable that is relevant for the true data generation process, but which we omit from our model. If this omitted variable is now completely uncorrelated with the other variables we control for, this is no big deal and we still can obtain unbiased estimators. If, on the other hand, there is a correlation with other control variables, the estimators are biased, which we call omitted variable bias. Going back to our example, aspects like motivation are certainly relevant for the labor market success but probably also correlated with whether a person will participate in the training program. If we do not control for this, we receive a biased estimator.  
+However, if such factors remain constant over time, we can fix them and use a dummy variable to extract the differences between the observed units for the estimated effect and only consider changes over time i.e., in the units. This is called adding fixed effects. In the case of the ARRA program, it would be quite conceivable that time-constant unobserved systematic differences between municipalities would bias the results, and we should therefore add fixed effects for these. Besides fixed effects for the municipality, we can also add time fixed effects for the variable `year`. Through these, we are enabled to control for underlying observable and unobservable systematic differences between the years.  
+By adding fixed effects for a variable, R automatically creates a dummy variable for every level of the variable of interest. For example, if we add time fixed effects for the variable `year`, four dummy variables would be generated, i.e. 2000, 2004, 2008, and 2012. This is an alternative way to control for a variable. You probably can imagine that it is quite time and memory-consuming to apply the standard OLS regression on a model with many dummies. The computer has to invert a matrix that has K+1 rows and columns. If you have ever tried to invert a matrix with just a few rows and columns by yourself, you know for sure that this is very time-consuming. However, luckily there is a command in the `felm()` function to add fixed effects quite easily. In the case of the ARRA program analyses, we want to add county-specific time trends as an interaction term of `year` and `counties`. If we do that, we must no longer control for the variable `year2012e` in our regression. This would lead to collinearity, meaning that control variables (`year2012e` and fixed effects for `year`) are highly correlated. We will not discuss this further in our problem set but note that it is important to avoid collinearity.
+
+<b style="color:blue">Task:</b> Fill in the blanks to build a model that includes the mentioned fixed effects. Keep the cluster robust standard errors from `reg2` included and store the model into `reg3`.
+Hint: To create an interaction term for factor variables such as `year` and `counties`, you have to write it into the brackets of `I()`.
+
+```{r "5_5"}
+___ = felm(___ ~ treated_year2012e + treated | ___ |0| ___, data = ___)
+
+```
+
+Before we take a closer look at our results and interpret them we want to add some variables from `ARRA` to our model that may have an important impact on the Democratic vote share and for which we should control, therefore. 
+
+<b style="color:blue">Task:</b> Complete the code to add `blackInterp`, `hispInterp`, `unempInterp`, `popdensity`, `RE`, `township`, `borough`, `city` to our model as simple control variables. Assign this model to `reg4`. Keep the cluster robust standard errors included. 
+
+```{r "5_6"}
+___ = felm(___ ~ treated_year2012e + treated + year2012e + ___ + hispInterp + unempInterp +  popdensity + RE  + township + ___ + city | 0 | 0 | ___, data = ARRA)
+```
+
+Good job! The first five control variables tell us the share of the black respectively Hispanic population, the unemployment rate, the population density of the municipalities, and the average house sale price. The last three variables are dummies for the municipal form of government that are equal to 1 if the municipality is a township, borough, or city.
+
+As the last step, we want to combine the two models `reg3` and `reg4` into one regression model. To avoid collinearity, also exclude `year2012e` from the regression.
+
+<b style="color:blue">Task:</b> In the last model we want to include the cluster robust standard errors, the county-specific time trends (fixed effects) and the demographic controls. Store it into `reg5` and use the `stargazer()` function to show all five regressions beside each other. Fill in the blanks.
+
+```{r "5_7",results='asis'}
+reg5 = felm(___ ~ treated_year2012e + ___ + blackInterp + hispInterp + unempInterp + popdensity + RE  + township + borough + city | ___ | 0 | ___, data = ___)
+stargazer(reg1, reg2, reg3, reg4, ___, type = "html", title = "Table 2: ARRA Public Good Spending and Voting - A binary measure", add.lines=list(c('Cluster robust standard errors', 'x','✓','✓','✓','✓'), c('Fixed effects', 'x','x','✓','x','✓'),c('Demographic controls', 'x','x','x','✓','✓')))
+```
+
+As we estimated all of the relevant regression models we can now take a closer look at the results. In the simple DiD regression `reg1` we estimated a treatment effect of 1.654 percentage points, which is the same as the result in chapter 3 where we used a formula to calculate the treatment effect by hand. This means that having an ARRA project nearby is estimated to increase the Democratic vote share by about 1.654 percentage points. The effect doesn't change as we include cluster robust standard errors for the municipalities but the standard error of the estimated effect drops quite sharply. While the effect is not significant in the first regression, it is in `reg2` even on the 1% level.  
+By including county-specific time trends in `reg3` we find a very similar coefficient of 1.791 percentage points. In `reg4`, after adding control variables for some demographic impacts to the initial model without the fixed effects, we estimate a slightly smaller effect (1.292 percentage points). The standard error of the relevant coefficients in `reg3` and `reg4` are similar to the one in `reg2` and both estimators are significant on the 1% level.  
+By combining the settings of the third and fourth models, our last regression model `reg5` estimates a treatment effect of 1.398 percentage points being significant on the 1% level. The relevant standard error of `reg5` is identical to the one from `reg4`. We notice that all of the effects are relatively close to 1.5 percentage points. The results are therefore quite stable to control variables for demographic groups and economic impacts. We estimate that proximity to an ARRA construction project increases the Democratic vote share by about 1.5 percentage points, depending on which model we look at.
+
+In the previous steps, we only concentrated on the binary treatment measure. That means that we used the dummy variable `treated`, which is rather 0 or 1 in our difference in difference estimation. Another approach is to use a continuous measure in which we replace the binary variable `treatment` with the continuous, actual distance of each municipality to the next ARRA project. The equation for this continuous approach is:
+
+\[DemVoteShare_{it} = \beta_{1}(Distance_{i}*Post_{t})+\beta_{2}Distance_{i}+\beta_{3}Post_{t}+\beta_{4}X_{i}+ u_{i,t}\]
+ 
+In the next step, we apply the continuous DiD approach to the `ARRA` data set, replicating the regressions `reg2` to `reg5` from above.
+
+<b style="color:blue">Task:</b> First create a new variable `distance_year2012e` in `ARRA` as an interaction of `Distance` and `year2012e`.
+
+```{r "5_8"}
+# Enter your code here.
+```
+
+Great! Now we can continue with our regression models.
+
+<b style="color:blue">Task:</b> Simply press check. In this chunk we estimate four regression models equivalent to the ones above (`reg2` to `reg5`) but using the continuous measure of treatment assignment instead. Remember that we exclude the variable `year2012e` in the models that include county-specific time trends in order to avoid collinearity. We assign the regression models to the variables `reg1_c`, `reg2_c`, `reg3_c` and `reg4_c` and show the results using `stargazer()`.
+
+```{r "5_9",results='asis'}
+reg1_c = felm(demo_share ~ distance_year2012e + Distance + year2012e |0|0| InputID, data = ARRA)
+
+reg2_c = felm(demo_share ~ distance_year2012e + Distance | I(counties*year)|0|InputID, data = ARRA)
+ 
+reg3_c = felm(demo_share ~ distance_year2012e +  Distance + year2012e + blackInterp + hispInterp + unempInterp +  popdensity + RE + city + borough + township | 0 | 0 | InputID, data = ARRA)
+
+reg4_c = felm(demo_share ~ distance_year2012e +  Distance + blackInterp + hispInterp + unempInterp +  popdensity + RE + city + borough + township | I(counties*year) | 0 | InputID, data = ARRA)
+
+stargazer(reg1_c, reg2_c, reg3_c, reg4_c, type = "html", title = "Table 3: ARRA Public Good Spending and Voting - A continuous measure", add.lines=list(c('Cluster robust standard errors','✓','✓','✓','✓'), c('Fixed effects', 'x','✓','x','✓'),c('Demographic controls','x','x','✓','✓')))
+```
+
+Generally speaking, we can say that a greater distance from an ARRA construction is associated with a lower Democratic vote share. `reg1_c` for example estimates a treatment effect of -7.403 percentage points, which is highly significant on the 1% level. In other words, this means that a increase in the distance of one standard deviation is related to a 0.62 percentage point drop in the Democratic vote share. We find this effect by multiplying the estimator by the standard deviation of `Distance`.
+
+<b style="color:blue">Task:</b> Try to calculate the effect on the Democratic vote share that arises for a change in distance of one standard deviation by yourself. You can use the absolute value for `reg1_c`.
+
+```{r "5_10"}
+# Enter your code here.
+```
+
+Good job. The regressions `reg2_c`, `reg3_c`, and `reg4_c` report results of -12.012, -6.140, and -9.930 percentage points. For a change in distance of one standard deviation (which is equal to 0.084), the models predict therefore a decrease in the Democratic vote share of approximately 1.01, 0.52, and 0.83 percentage points. In addition, all estimators found are significant at the 1% level. Despite the fact that the estimated coefficients vary in their magnitude, they are all clearly negative, showing that the Democratic election outcome decreases with increasing distance to an ARRA project. Thus, municipalities in the immediate proximity of an ARRA project tend to have a higher Democratic vote share in 2012. 
+
+The next step is to ask ourselves where these additional votes come from. In the following chapter, we will deal with this question in detail and try to find the source of this effect.
+
+## Exercise 5 -- The Background - Where are all the votes coming from?
+
+We have to load the data set `ARRA` at the beginning of every exercise. Simply press the check button.
+
+```{r "6_1"}
+ARRA = readRDS("ARRA.RDS")
+ARRA = ARRA %>%
+  mutate(treated_year2012e = treated*year2012e)
+```
+
+An interesting question to think about is what the background behind our estimated effects is. Of course, the additional voter support for the Democratic Party has to come from somewhere. I can come up with three possible explanations. The first is that additional votes come from people who have not previously participated in an election. This would suggest that proximity to an ARRA project increases the voter turnout in a municipality. Another possibility would be that individuals, who have previously voted Republican, through proximity to the ARRA project will reconsider their voting decision and vote Democratic in the next election. The last possible explanation, in my view, would be that the new votes are not from former Republican voters, but rather from the substitution of third-party votes.  
+In the following steps, we will try to find which of these explanations is the most likely one.
+
+First, let's take a quick look at one variable that we will use below. `demo_share_ofRD` calculates the share of the votes for the Democrats from the sum of the votes that went to the Democratic and Republican candidates. It, therefore, ignores the votes that went to a third party and we call it the two-party Democratic vote share.
+
+
+Quiz: Do you know which statement is correct based on how the variables are calculated?
+
+[1]: The variable demo_share_ofRD is generally smaller than demo_share.
+[2]: The variable demo_share_ofRD is generally larger than demo_share.
+[3]: We cannot say in principle which variable is larger or smaller.
+[4]: Both variables should be about the same size.
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("Different Democratic vote shares.")
+```
+
+To answer this question let's take a look at a graph that shows the means of these two variables over the time. First, we have to compute the mean of `demo_share` and `demo_share_ofRD` in each year.
+
+<b style="color:blue">Task:</b> Fill in the blanks to create a new data set `vote_shares`. It should contain the means of `demo_share` and `demo_share_ofRD` for every year. Assign these values to `mean_demo_share` and `mean_demo_share_ofRD`. Show the head of this new data set.
+
+```{r "6_2"}
+___ = ARRA %>%
+  group_by(___) %>%
+  summarise(___ = mean(demo_share),
+            mean_demo_share_ofRD = mean(___))
+head(___)
+```
+
+Good job. As you can see the data set is in the so-called **wide format**. To generate the requested plot it is helpful to convert `vote_shares` into the **long format**. Even if there are other possibilities, this is the most convenient way. To this end, we use the `gather()` command from the `tidyr` package. 
+
+```{r eval=FALSE}
+# Run for additional info in the Viewer pane
+info("long vs. wide")
+```
+
+<b style="color:blue">Task:</b> Press the check button.
+```{r "6_3"}
+library(tidyr)
+vote_shares_long <- gather(vote_shares, type, mean_demo_share,  mean_demo_share:mean_demo_share_ofRD)
+vote_shares_long
+```
+
+In our new long data set, there are three columns that we use to create our graph. The column `mean_demo_share` now contains the values that were previously found in the two different columns `mean_demo_share` and `mean_demo_share_ofRD`. `type` on the other hand shows what kind of vote share each observation is, to allow plotting in different colors.
+
+<b style="color:blue">Task:</b> Complete the code to create a plot that shows the two different Democratic vote shares over the years 2000 to 2012. Both lines should be plotted in different colors. You can use the data set we just created.
+
+```{r "6_4",out.width='75%'}
+ggplot(data = ___, aes(y=mean_demo_share, x=___, color=___)) +
+  geom_line(size = 0.7) +
+  ylim(45, 60) +
+  labs(color = "Legend") +
+  scale_x_continuous(breaks = seq(2000, 2012, by = 4)) +
+  scale_color_manual(labels = c("Demo share", "Demo share of RD"), values = c("red", "blue")) +
+  ylab("Democratic vote shares") +
+  xlab("Years") +
+  ggtitle("Figure 6: Regular Democratic vote share vs. two party vote share") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+From this Figure 6, it is now quite clear what the proportions of `demo_share` and `demo_share_ofRD` are. We recognize that the line for the two-party Democratic vote share generally runs above the line for the Democratic share of all votes. The reason for this fact is that in both figures the number of Democratic votes is the same, but the population differs in each case. Thus, in case of `demo_share_ofRD`, it only contains the votes that went to the Democratic and Republican parties, and in the case of `demo_share`, it additionally contains the votes for third parties. If both shares are represented as a fraction, the numerator is the same in each case, but the denominator is larger for `demo_share`. This means that `demo_share_ofRD` is generally larger.
+
+The following chunk contains four regressions that are equivalent to the ones with the binary treatment measure that we estimated in chapter 4. The only difference is, that we use the two-party Democratic vote share  `demo_share_ofRD` as the dependent variable. With this regression model, we try to check whether the estimated effect of the treatment, or at least part of it, can be explained by the substitution of third-party votes. This would mean that voters who previously voted, but did not choose either the Democratic or the Republican Party, are more likely to vote Democratic because of the proximity to an ARRA project. If this was indeed the case, the estimated coefficients of the following regressions should be markedly smaller than the estimators found in the previous binary models. These results would indicate that many of the new votes for the Democratic Party are from the substitution of third-party votes.
+
+<b style="color:blue">Task:</b> Press the check button.
+```{r "6_5",results='asis'}
+reg1_twoparty = felm(demo_share_ofRD ~ treated_year2012e + treated + year2012e | 0 | 0 | InputID, data = ARRA)
+
+reg2_twoparty = felm(demo_share_ofRD ~ treated_year2012e + treated |I(counties*year) | 0 | InputID, data = ARRA)
+
+reg3_twoparty = felm(demo_share_ofRD ~ treated_year2012e + year2012e + treated + blackInterp + hispInterp + unempInterp +  popdensity + RE + city + borough + township | 0 | 0 |InputID, data = ARRA)
+
+reg4_twoparty = felm(demo_share_ofRD ~ treated_year2012e + treated + blackInterp + hispInterp + unempInterp +  popdensity + RE + city + borough + township|I(counties*year) | 0 | InputID, data = ARRA)
+
+stargazer(reg1_twoparty, reg2_twoparty, reg3_twoparty, reg4_twoparty, type = "html", title = "Table 4: ARRA Public Good Spending and Voting - Two party vote share", add.lines=list(c('Cluster robust standard errors','✓','✓','✓','✓'), c('Fixed effects', 'x','✓','x','✓'),c('Demographic controls','x','x','✓','✓')))
+```
+
+As you compare the coefficients with the results from exercise 4 you will notice that they have slightly changed but neither is this change particularly large nor do the estimated effects of all models become smaller. For example, the coefficient of 1.778 estimated in `reg1_twoparty` is only about 1/3 standard error larger than the equivalent estimator (1.654) from Task 4. Similar results are obtained for the other regressions. The significance does not change notably. These results indicate that the substitution of third-party votes probably does not account for the majority of the effect. The two remaining possible background mechanisms are the mobilization of new voters due to the treatment and a shift in Republican voters' policy preferences towards the Democratic Party.
+
+In the next step, we want to check whether the presidential voter turnout changes by the treatment and whether the increase in the Democratic vote share can thus be explained. To this end, we perform the same DiD regressions from previous steps again, with the Presidential voter turnout `Turnoutpc` as the dependent variable. This figure is calculated from the total presidential votes cast in a municipality divided by the population in this municipality in the year 2012.  
+Before we run our regressions we need to look at some specifics in the data.
+
+<b style="color:blue">Task:</b> Fill in the blanks to filter the `ARRA` data set for values of `Turnoutpc` greater than 1. Limit your output to the variables `year`, `pop_total`, `TotalVote`, and `Turnoutpc`.
+
+```{r "6_6"}
+ARRA %>%
+  filter(___ > 1) %>%
+  ___(year, pop_total, TotalVote, ___)
+```
+
+As mentioned before, the variable `Turnoutpc` shows the turnout in a given year in a municipality. You will probably notice that a turnout of more than 1, i.e. 100%, does not make much sense at first glance, since it's not possible (at least not legally) that more than 100% of all residents can vote. In my opinion, two possible reasons can explain these data:  
+The first is due to the fact that the data for population size used to calculate `Turnoutpc` was the one from 2012. So it could be possible that for an election before 2012, the number of voters by 2012 had fallen below the number of votes cast at the time of the election. The result would be, that the turnout would be greater than 100%. In the data set we just generated, we also find observations from 2012. For these, we can calculate the turnout by simply dividing the value for `TotalVotes` by the value of `pop_total`. With this procedure, we are indeed able to calculate the values of about 1.09 and 2.40 that we find in the data set. However, these two observations also show us that the reason we have just discussed cannot explain all of these questionable values of `Turnoutpc`. Since these observations are actually from 2012, it's not possible that the population size changed in such a way that can explain a turnout greater than 100%. Thus, there must be another reason for these data which could simply be incorrectly transmitted data.  
+A former president of the US would probably be a bit more skeptical about these statements and would rather prefer to go to the Supreme Court and challenge all these election results. Well, he probably still secretly thinks votes were stolen and he won his last election.    
+However, for our following analysis, we restrict ourselves to observations whose `Turnoutpc` is at most 100%.
+
+**Note:** This procedure could be problematic as well since we remove individual observations from the population for the regression. However, we will just follow the procedure in the underlying research paper.
+
+<b style="color:blue">Task:</b> Filter the data in `ARRA` on `Turnoutpc` <= 1. Assign the new data set to `ARRA_turnout` and show its head.
+```{r "6_7"}
+# Enter your code here.
+```
+
+Our new data set `ARRA_turnout` only contains observations with a voter turnout of at most 100%. We can now estimate the required regression models with the filtered data.
+
+<b style="color:blue">Task:</b> Press check.
+```{r "6_8",results='asis'}
+reg1_turnout = felm(Turnoutpc ~ treated_year2012e + treated + year2012e | 0 | 0 | InputID, data = ARRA_turnout)
+
+reg2_turnout = felm(Turnoutpc ~ treated_year2012e + treated  | I(counties*year) | 0 | InputID, data = ARRA_turnout)
+
+reg3_turnout = felm(Turnoutpc ~ treated_year2012e + treated + year2012e + blackInterp + hispInterp + unempInterp +  popdensity + RE + city + borough + township | 0 | 0 |InputID, data = ARRA_turnout)
+
+reg4_turnout = felm(Turnoutpc ~ treated_year2012e + treated  + blackInterp + hispInterp + unempInterp +  popdensity + RE + city + borough + township|I(counties*year) | 0 | InputID, data = ARRA_turnout)
+
+stargazer(reg1_turnout, reg2_turnout, reg3_turnout, reg4_turnout, digits = 5,type = "html", title = "Table 5: ARRA Public Good Spending and Voting - Voter turnout", add.lines=list(c('Cluster robust standard errors','✓','✓','✓','✓'), c('Fixed effects', 'x','✓','x','✓'),c('Demographic controls','x','x','✓','✓')))
+```
+
+
+Quiz: Based on these results, which statement is correct?
+
+[1]: The change in the voter turnout is probably relatively large.
+[2]: Most of the estimated relevant coefficients are highly significant.
+[3]: The coefficients of interest are not significant on a relevant level.
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("Presidential voter turnout")
+```
+
+You're right. As you can see the coefficients for `treated_year2012e` of all the models indicate an effect relatively close to 0. In addition, none of them is significant on a relevant level. Looking for example at the first column you may notice that the 95% confidence interval excludes effects of in amount one percentage point. We can easily compute these boundaries, by using a rule of thumb for the 95% confidence interval. This states that the interval can be calculated approximately from **ß<sub>i</sub> +/- 2 * se<sub>i</sub>**, where ß<sub>i</sub> is the estimated coefficient and se<sub>i</sub> represents the standard error for this coefficient. The upper boundary results from the sum and the lower one from the difference. If we plug in our values, we can compute a 95% confidence interval of [-0.008702, 0.009538] for the relevant estimator of `treated_year2012e`. The 95% confidence interval, therefore, excludes values that are smaller than ~ -0.0087 and larger than ~0.0095 percentage points.   
+Based on these very small and non-significant effects in connection with the results from the previous task, one can say that probably neither the substitution of third-party votes nor a significant mobilization of new voters is the main reason for the increase in the Democratic vote share. Since we can rather rule out these two explanations, it seems more likely that voter migration is responsible for most of the effect. Republican voters thus perceive the projects and the labels pointing to the Democratic Party as the main culprit very positively and in some cases may change their voting decision. That is at least one possible explanation why former Republican voters might change their minds. 
+
+As you head on to the last chapter before the conclusion we try to investigate which mechanisms can explain these results. Are there other possible mechanisms besidees the one we just mentioned? Why does the Democratic Party, of all parties, benefits so much from the ARRA program?
+
+
+## Exercise 6-- Mechanisms behind the effect
+
+We have to load the data set `ARRA` at the beginning of every exercise. Simply press the check button.
+
+```{r "7_1"}
+ARRA = readRDS("ARRA.RDS")
+ARRA = ARRA %>%
+  mutate(treated_year2012e = treated*year2012e)
+```
+
+In this last substantive chapter, we examine the mechanisms that might explain the results of the previous chapter. What are possible reasons that the treatment, i.e., proximity to an ARRA project, gets previous Republican voters to vote Democratic? From my point of view, there are at least two mechanisms that, while in principle rather competing, may well coexist:  
+The first conceivable mechanism describes the change in political preferences related to what people consider to be an appropriate level of taxation for public expenditure. Perhaps you can imagine that the ARRA projects emphasize the benefits of an expansionary government for the citizen. The signs people see every day, constantly remind them about the fact that, for example, the new road they are using right now, was enabled through their tax dollars. Now, it is conceivable that this fact may get voters to support more pro-tax and pro-spending parties (in our case, the Democratic Party).  
+The other conceivable mechanism has less to do with political preferences and more with the economic consequences of spending on ARRA projects and human nature. In the introduction, I mentioned that one goal of the American Recovery and Reinvestment Act was to stimulate the American economy during the Great Recession. As a result of this spending, better economic conditions may be found in the areas where ARRA construction projects have been carried out i.e. in the municipalities in the treatment group. The reason for this could be both the proximity of the labor force to the construction project site or through the expenditure of workers at the workplace and the associated multiplier effects. Furthermore, some studies find evidence of the effect that incumbents are more likely to be re-elected when economic conditions are better. Since the American Recovery and Reinvestment Act was passed during the term of a Democratic president, some voters tend to vote Democratic in the next election again or for the first time based on this mechanism. We refer to this mechanism as the **political multiplier channel**. 
+
+For a better illustration we consider the following equation:
+
+\[V = f(TaxCost, Benefit, EconomicConditions)\]
+
+Where V is the probability of voting Democratic and a function of the three terms `TaxCost`, `Benefit`, and `EconomicConditions`. The term `TaxCost` represents the amount of tax a person has to pay, `Benefit` indicates the perceived benefit to the taxpayer from public spending, and `EconomicConditions` stand, as the name suggests, for the economic circumstances in a municipality.  
+The following holds for the three terms:
+
+\[\frac{\partial V}{\partial TaxCost} < 0\]
+\[\frac{\partial V}{\partial Benefit} > 0\]
+\[\frac{\partial V}{\partial EconCond} > 0\]
+
+
+Quiz: Take a look at the first derivative. Which statement is correct? You can assume we're considering the ceteris paribus effect, i.e. that the other variables do not change.
+
+[1]: As TaxCost increases, the probability of voting Democratic raises.
+[2]: TaxCost has no impact on V.
+[3]: As the TaxCost increases, the probability of voting Democratic decreases.
+
+```{r eval=FALSE}
+# Run line to answer the quiz above
+answer.quiz("Derivatives")
+```
+
+Well done. The direction of the effects should be quite clear and comprehensible. Increasing tax rates (`TaxCost`) will lead to a decrease in the likelihood of voting Democratic. This is due to the fact that tax increases are more likely to be associated with the Democratic party. The second derivation shows that, as the voter's `Benefit` from tax-financed public spending increases, the probability of voting Democratic increases too. The third and final derivation indicates that the effect of better `EconomicConditions` on the probability of voting for the Democratic candidate is also positive. This is because in our case the incumbent was a Democrat and, as mentioned above, people that live in good economic conditions tend to vote for the current candidate or party again.  
+**Note:** We are always considering the **ceteris paribus effect**. This means that we assume that only the variable we are looking at changes, while all the other influences remain the same.
+
+Now we can try to build up an equation that shows the effect of the ARRA construction program on the probability to vote for the Democratic party `V`:
+
+\[\frac{\partial V}{\partial ARRA} = (\frac{\partial V}{\partial Benefit})(\frac{\partial Benefit}{\partial ARRA}) + (\frac{\partial V}{\partial EconCond})(\frac{\partial EconCond}{\partial ARRA}) + C\]
+
+The summand C in our case represents the effect of the ARRA program on the perceived tax level. It is positive if the individuals expect that the taxes from the previous year are sufficient to cover the expenses or negative if they think that this is not the case. For the overall effect of the ARRA program on the probability of voting Democratic to be positive, we need at least one of the first two terms in the equation above to be positive. These first two summands, if positive, can be associated with the respective two competing mechanisms we explained at the beginning of this chapter. Let's consider the first summand as an example: The second part of the product represents the change in `Benefit` that citizens receive from the presence of an ARRA project.  
+The first part represents the change in `V` when `Benefit` changes. Thus, this summand represents the change in the probability of voting Democratically due to the change in `Benefit` caused by the ARRA project.  
+The second summand can be interpreted similarly, except that instead of `Benefit` we consider the `EcononomicConditions`.
+
+In the following task, we try to distinguish between these two mechanisms. To this end, we use the following model, which is similar to the one we used to estimate the DiD effect, extended by two terms: 
+
+\[DemVoteShare_{it} = \beta_{1}(Treat_{i}*Post_{t})+\beta_{2}Treat_{i}+\beta_{3}(Amount_{i}*Post_{t})+\beta_{4}Amount_{i}+\beta_{5}Year_{t}+\beta_{6}X_{i}+ u_{i,t}\]
+
+Amount<sub>i</sub> represents the total dollar expenditure that the municipality receives from the ARRA program and is equal to 0 if the municipality is not in the treatment group. The interaction term (Amount<sub>i</sub> * Post<sub>t</sub>) is an alternative difference in difference estimator for the political multiplier channel.
+
+<b style="color:blue">Task:</b> Press the check button. We estimate four regression models of the equation with time fixed effects for the variable `year` and different measures for the amount. We will discuss the difference between them in a second.
+
+```{r "7_2",results='asis'}
+reg1_m = felm(demo_share ~ treated + treated_year2012e + amount_alternative_I + amountI_2012 |year|0|InputID, data = ARRA)
+
+reg2_m = felm(demo_share ~ treated + treated_year2012e + amount_alternative_II + amountII_2012 |year|0|InputID, data = ARRA)
+
+reg3_m = felm(demo_share ~ treated + treated_year2012e + amount_alternative_III + amountIII_2012 |year|0|InputID, data = ARRA)
+
+reg4_m = felm(demo_share ~ treated + treated_year2012e + amount_alternative_4 + amount4_2012 |year|0|InputID, data = ARRA)
+
+stargazer(reg1_m, reg2_m, reg3_m, reg4_m, digits = 4, type = "html",  omit = c("amount_alternative_I", "amount_alternative_II", "amount_alternative_III", "amount_alternative_4"), title = "Table 6: ARRA Public Good Spending and Voting - Political mutiplier channel", add.lines=list(c('Cluster robust standard errors','✓','✓','✓','✓'), c('Fixed effects', 'x','✓','x','✓'),c('Demographic controls','x','x','✓','✓')))
+```
+
+Before we interpret our results, let's take a look at the regressions we just estimated. The first part of each one corresponds to our difference in difference estimator from previous chapters. Since we add fixed effects for the years, we do not need to control for `year2012e`. In addition, we find a term for the total expenditure flowing to the municipality from the eventual ARRA project. We have to consider the fact that there are different approaches to distribute the total dollar expenditure of a single ARRA project to the nearby municipalities. Since an ARRA project is usually located next to several municipalities, the total amount of money does not only flow to a single one. Due to this reason, there are four options, regarding how much money each municipality receives. This results are given by the terms `amount_alternative_I`, `amount_alternative_II`, `amount_alternative_III`, and `amount_alternative_4`. The last term found in the regression equation is an interaction term of the variables just mentioned with an indicator for the year being greater than 2008 that represents the experimental period. If we, for example, consider `reg1_m`, the factor `amountI_2012` is obtained by multiplying `amount_alternative_I` by `year2012e`. These two terms `amount_alternative_I` and `amountI_2012` in combination represent an alternative DiD approach to estimate the possible political multiplier channel.    
+The estimated results show that the interaction term (Amount<sub>i</sub> * Post<sub>i</sub>) is not significantly different from 0 in all the considered cases (`reg1_m` - `reg4_m`). The estimated coefficients vary between about -0.0015 and -0.0003 percentage points and are not significant on any relevant level. This means that the amount of money per project is unlikely to have a significant impact on the Democratic vote share. This fact raises doubts about the relevance of the political multiplier channel. It is therefore likely that the mechanism considering the impact on the local economy and the associated tendency to re-elect the incumbent plays a rather minor role. Nevertheless, it remains important to mention, however, that this mechanism could play a greater role as we consider larger spending projects than the ARRA program. To give you an idea of this: In the case of the American Recovery and Reinvestment Act, it is estimated that in a municipality that was treated, there were on average only about 56 newly created jobs. I think we can agree on the fact that new jobs in this order of magnitude are unlikely to affect the economic conditions in a municipality in a relevant way.  
+Based on these results, it is more likely that, in the case of the ARRA program, the other mechanism is more important. As voters in treated municipalities pass by signed ARRA projects very frequently, their political preferences might change accordingly, so they prefer to vote Democratic in the future. They realize that they are not only burdened by the taxes but that they also contribute to public expenditures that generate positive benefits for them.  
+Of course, this conclusion would not hold if we found another mechanism that could explain the results. In this case, we would also have to compare these two empirically.
+
+## Exercise 7 -- Conclusion
+
+In the last chapter of this problem set, we will briefly summarize the results so far and review the central aspects of this work:
+
+In **chapter 1** of this problem set, we used some standard commands to get an initial overview of the data and looked at, among other things, what the classification of the municipalities into treatment and control group was based on.  
+
+**Chapter 2** was devoted to descriptive analysis. First, we worked with the map data, which allowed us to create a nice plot of the municipalities in New Jersey. We discovered relatively quickly that this task was not as easy as we had hoped, due to erroneous data. However, we learned an important lesson, namely that in the reality it happens quite often that we receive incorrect or missing data and that we first have to add or correct them ourselves. Once that was done, we were able to use `ggplot()` to generate a map of New Jersey showing the individual municipalities and distinguishing them by color into treatment and control group.  
+
+In **chapter 3**, we slowly approached the difference in difference method. To this end, we first assumed that the randomization of the experiment was perfect and that we could thus easily calculate the causal unbiased treatment effect. However, since the randomization was not sufficient, we had to extend our formula by the historical difference from the pre-experimental period. This gave us the correct formula for the difference in difference approach. In the end, we found a causal treatment effect of **1.65 percentage points**. This means that the Democratic vote share in municipalities whose distance to the nearest ARRA project is less than 5 km, increases by 1.65 percentage points. There is an essential condition for the application of the DiD estimator. The parallel trends assumption. This assumption states that without the experiment, the difference in the outcomes between the treatment and control groups should be constant over time. We were able to check and confirm this assumption with the help of a graph and could therefore continue to use the DiD estimator.    
+
+Finally, in **chapter 4**, we used regression models to estimate the treatment effect of the proximity to an ARRA project on the Democratic vote share. First, we used a binary measure for the treatment with the dummy variable `treated` as a control variable. Considering different models that take into account, for example, cluster robust standard errors, county-specific time trends, and demographic controls, we found significant estimators in the order of magnitude of about 1.5 percentage points confirming the result from chapter 3. This suggests that having an ARRA project nearby is estimated to increase the Democratic vote share by about **1.5 percentage points**, depending on which model we look at. This is also one of the main results of our work. Another approach was to repeat the same regressions with a continuous measure for the treatment. We replaced the dummy treatement variable with the continuous variable `Distance`. Thus, we obtained coefficients showing that a **greater distance from an ARRA construction** is **associated** with a **lower Democratic vote share**. Using both the continuous and binary treatment measures, we obtained significant estimators at the 1% level.    
+
+In **chapter 5**, we addressed the question of where the additional votes for the Democratic Party come from. Conceivably, the treatment could increase the voter turnout, previous Republican voters could decide to vote Democratic, or the additional votes could come from replacing third-party votes. Through some further regressions using the same explanatory variables as above but different dependent variables, we concluded that the replacement of third-party votes as well as the mobilization of new votes probably plays a minor role. Much more likely, therefore, is a migration of voters who previously voted Republican to the Democratic Party.  
+
+In the last substantive **chapter 6**, we dealt with the mechanisms behind the effects found. Here, two mechanisms are conceivable. First, voters change their political preferences and tend to favor pro-spending and pro-tax parties because they enjoy the benefits from tax-financed projects. Another mechanism could be due to the fact that people tend to re-elect the incumbent in economically strong times. To test these theories, we revisited the original difference in difference model, adding a term for the dollars spent on a municipality as well as an interaction of it with an indicator for the experimental period. Our results suggested that this increase in the likelihood of voting Democratic is mainly due to the first mentioned mechanism. Voters are reminded of the benefits they receive from their tax payments by the fact that they see the signage of a project every day. This may shift their political preferences in favor of the more tax and spending-friendly Democratic party. Thinking more deeply, it is also conceivable that the signs informing people about where the funding for projects comes from could have the opposite effect. What originally was planned as a transparency initiative could also be interpreted by the voters as an attempt to deliberately influence the election results. This would probably lead to an opposite reaction to the election result. Although it is a rather complex issue and many factors can strongly change the results, it is to be expected that the basic mechanisms and effects can not only be found case of the ARRA program, but also in other tax-financed expenditure projects for public goods. 
+
+But enough about this problem set. I really hope you enjoyed it and learned something new! 
+
+## Exercise 8 -- Appendix
+
+This appendix contains some additional information about my work that is not needed to complete the problem set.
+
+1. The data set `ARRA.RDS` I provided, does not completely match the original data set `20170151_ARRA.dta`. In the original one, there were 68 variables, of which I removed those that were not needed for our further purposes. In the data set, I have provided to the reader, there were only 31 variables for the sake of clarity. In addition, I saved the data set as an RDS file to make the work in R easier.  
+2. I have also pre-edited the data set `map.RDS`. It was originally stored as a geosjon file and this would have led to a longer running time when reading and displaying the data. I have therefore stored it as an RDS file. In addition, I removed variables that were not relevant for our purposes and reduced the number of columns from initially 26 to just 2.    
+3. A bigger problem I encountered during my work was the fact that, in the data set I was provided with and which I labeled `ARRA`, there were incorrect values for the variable `InputID`. As explained in task 2, this could be detected because there were NAs after the join with the map data. This could be seen in the map plot. To fix this problem, I compared the geographic location of the municipalities with the missing values to an online map of New Jersey. This allowed me to locate the rough position of each municipality. For these municipalities, I compared data like the size or the population. It was helpful that both `ARRA` and the already mentioned online map contained these data. After identifying the correct values for the `InputID`, I corrected the wrong ones. Thus there were only matches with the values of `CENSUS2010` from `map`.  
+4. In some of the regressions I estimated in chapters 4-6, I found different coefficients and standard errors compared to the underlying research paper. This especially holds for those regressions that do only include the additional demographic control variables. Thus, I estimated coefficients of: *1.292* in my fourth regression of Table 2 (*versus 1.307* in the underlying paper), *-6.140* in the third regression of Table 3 (*versus -6.125*), *1.399* in the third regression of Table 4 (versus *1.414*), *0.00040* in the first regression of Table 5 (versus *0.000418*) and *0.00712* in the third regression of Table 5 (versus *0.00680*). These differences are quite small and do not change the basic results found in this problem set. Unfortunately, I could not determine the reasons for the different coefficients. It was not possible even after looking at the Stata code that was used to produce the values in the underlying paper.  
+5. In table 6 of this problem set, I have shortened the stargazer output. This is for the sake of clarity. I only dropped values that are not relevant to our interpretation.
+
+## Exercise 9 -- References
+
+### Bibliography
+
+Britannica, T. Editors of Encyclopaedia (1998). municipality. Encyclopedia Britannica. https://www.britannica.com/topic/municipality
+
+Cameron, A. C., & Miller, D. L. (2015). A practitioner’s guide to cluster-robust inference. Journal of human resources, 50(2), 317-372.
+
+Cameron, A. C., & Trivedi, P. K. (2005). Microeconometrics: methods and applications. Cambridge university press.
+
+Chin, M. (2021). What are global public goods? International Monetary Fund. https://www.imf.org/en/Publications/fandd/issues/2021/12/Global-Public-Goods-Chin-basics
+
+Cowen, T. (2008). Public goods. The concise encyclopedia of economics, 197-199.
+
+Cran R Project. Introduction to dplyr. https://cran.r-project.org/web/packages/dplyr/vignettes/dplyr.html
+
+Data Carpentry. (2022). Data visualization with ggplot2. https://datacarpentry.org/R-ecology-lesson/04-visualization-ggplot2.html
+
+DataScience Made Simple. (2022) Join in R: How to join (merge) fata frames (inner, outer, left, right) in R. https://www.datasciencemadesimple.com/join-in-r-merge-in-r/
+
+Huet-Vaughn, E. (2019). Stimulating the vote: ARRA road spending and vote share. American Economic Journal: Economic Policy, 11(1), 292-316.
+
+Kranz, S. (2021). Empirical Economics with R. 4 Difference-in-Difference Estimation and Estimating the Impact of Search Engine Marketing. Ulm University.
+
+McKenzie, D. (2017). World bank blogs. When should you cluster standard errors? New wisdom from the econometric oracle. https://blogs.worldbank.org/impactevaluations/when-should-you-cluster-standard-errors-new-wisdom-econometrics-oracle
+
+Nichols, A., & Schaffer, M. E. (2007, September). Clustered standard errors in Stata. In United Kingdom Stata Users' Group Meetings 2007 (No. 07). Stata Users Group.
+
+Süssmuth, B., & Komlos, J., (2022). Empirische Ökonomie: Eine Einführung in Methoden und Anwendungen (2nd edition). Springer-Verlag.
+
+Thieme, C. (2021). Understanding Linear Regression Output in R, Towards Data Science, https://towardsdatascience.com/understanding-linear-regression-output-in-r-7a9cbda948b3
+
+Tutorialspoint. R -Data Types. Tutorialspoint. https://www.tutorialspoint.com/r/r_data_types.htm
+
+United States Naval Academy. (2019). Approximate Metric Equivalents for Degrees, Minutes, and Seconds. https://www.usna.edu/Users/oceano/pguth/md_help/html/approx_equivalents.htm
+
+
+### R Packages
+
+Gaure, S. (2022). lfe: Linear Group Fixed Effects. R package version 2.8-8. URL: https://cran.r-project.org/web/packages/lfe/index.html
+
+Hlavac, M. (2022). stargazer: Well-Formatted Regression and Summary Statistics Tables. R package version 5.2.3. URL https://cran.r-project.org/web/packages/stargazer/index.html 
+
+Kranz, S. (2020): RTutor. Interactive R Problem Sets. R package version 2020.11.25. URL: https://github.com/skranz/RTutor
+
+Wickham et al. (2022). dplyr: A Grammar of Data Manipulation. R package version 1.0.9. URL: https://cran.r-project.org/web/packages/dplyr/index.html
+
+Wickham et al. (2022). ggplot2: Create Elegant Data Visualisations Using the Grammar of Graphics. R package version 3.3.6. URL: https://cran.r-project.org/web/packages/ggplot2/index.html
+
+Wickham H., Girlich M. (2022). tidyr: Tidy Messy Data. R package version 1.2.1. URL: https://cran.r-project.org/web/packages/tidyr/index.html
+
+### Data
+
+The data used to replicate the problem set can be found here: https://www.openicpsr.org/openicpsr/project/114715/version/V1/view
+
+The data used to create the map of New Jersey can be found here:
+https://njogis-newjersey.opendata.arcgis.com/maps/municipal-boundaries-of-nj
+
+The online map I used to correct the erroneous data for `InputID` can be found here:
+https://www.openicpsr.org/openicpsr/project/114715/version/V1/view
+
+The image of an ARRA sign can be found here: https://www.codot.gov/assets/images/news/new-release-images/constructionsignARRA.jpg/image_view_fullscreen" target="_blank
+
+All of the above links were accessible as of September 09, 2022.
+
+Figures 6: own illustration.
